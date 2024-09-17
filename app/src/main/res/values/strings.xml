@@ -3,4 +3,5 @@
     <string name="enter_number">Enter number</string>
     <string name="calculate_the_sum_of_squares">Calculate the sum of squares</string>
     <string name="result">Result</string>
+    <string name="please_enter_a_valid_number">Please enter a valid number</string>
 </resources>
