@@ -2,6 +2,7 @@ package com.denyskostetskyi.multithreadingapp;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.SeekBar;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.StringRes;
@@ -16,6 +17,7 @@ import java.math.BigInteger;
 
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
+    private int numberOfTasks = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,7 +30,36 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        initViews();
+    }
+
+    private void initViews() {
+        updateSeekBarLabel();
+        setSeekBarChangeListener();
         setButtonClickListener();
+    }
+
+    private void updateSeekBarLabel() {
+        String text = getString(R.string.number_of_parallel_tasks, numberOfTasks);
+        binding.textViewNumberOfTasks.setText(text);
+    }
+
+    private void setSeekBarChangeListener() {
+        binding.seekBarNumberOfTasks.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                numberOfTasks = progress + 1;
+                updateSeekBarLabel();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
     }
 
     private void setButtonClickListener() {
@@ -59,6 +90,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateLoadingState(boolean isLoading) {
         binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        binding.seekBarNumberOfTasks.setEnabled(!isLoading);
         binding.buttonCalculate.setEnabled(!isLoading);
     }
 

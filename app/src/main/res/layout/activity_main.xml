@@ -15,12 +15,34 @@
         android:autofillHints=""
         android:hint="@string/enter_number"
         android:inputType="number"
-        app:layout_constraintBottom_toTopOf="@+id/buttonCalculate"
+        app:layout_constraintBottom_toTopOf="@+id/textViewNumberOfTasks"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_chainStyle="packed" />
+
+    <TextView
+        android:id="@+id/textViewNumberOfTasks"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:text="@string/number_of_parallel_tasks"
+        app:layout_constraintBottom_toTopOf="@id/seekBarNumberOfTasks"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/editTextInput" />
+
+    <SeekBar
+        android:id="@+id/seekBarNumberOfTasks"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:max="4"
+        android:progress="0"
+        app:layout_constraintBottom_toTopOf="@id/buttonCalculate"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textViewNumberOfTasks" />
 
     <Button
         android:id="@+id/buttonCalculate"
@@ -30,9 +52,8 @@
         android:text="@string/calculate_the_sum_of_squares"
         app:layout_constraintBottom_toTopOf="@id/scrollView"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/editTextInput" />
+        app:layout_constraintTop_toBottomOf="@id/seekBarNumberOfTasks" />
 
     <ScrollView
         android:id="@+id/scrollView"
@@ -41,7 +62,6 @@
         android:layout_margin="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/buttonCalculate">
 
@@ -52,7 +72,6 @@
             android:hint="@string/result"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/buttonCalculate" />
     </ScrollView>
