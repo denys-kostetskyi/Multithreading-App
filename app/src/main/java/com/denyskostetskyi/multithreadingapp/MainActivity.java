@@ -30,11 +30,29 @@ public class MainActivity extends AppCompatActivity {
     private void setButtonClickListener() {
         binding.buttonCalculate.setOnClickListener(v -> {
             binding.textViewResult.setText("");
-            calculate();
+            long input = getInputNumber();
+            if (input == 0) {
+                showWarning();
+            } else {
+                calculate(input);
+            }
         });
     }
 
-    private void calculate() {
+    private long getInputNumber() {
+        String inputStr = binding.editTextInput.getText().toString();
+        try {
+            return Long.parseLong(inputStr);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
 
+    private void showWarning() {
+        binding.textViewResult.setText(R.string.please_enter_a_valid_number);
+    }
+
+    private void calculate(long input) {
+        binding.textViewResult.append("" + input);
     }
 }
