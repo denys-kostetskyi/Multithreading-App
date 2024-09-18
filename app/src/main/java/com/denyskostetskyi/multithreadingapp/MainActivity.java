@@ -1,6 +1,7 @@
 package com.denyskostetskyi.multithreadingapp;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.SeekBar;
 
@@ -12,8 +13,13 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.denyskostetskyi.multithreadingapp.databinding.ActivityMainBinding;
+import com.denyskostetskyi.multithreadingapp.model.Range;
+import com.denyskostetskyi.multithreadingapp.util.RangeUtils;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
@@ -95,24 +101,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void calculate(long input) {
-        calculateUsingThread(input);
+        calculateUsingThreads(input);
     }
 
-    private void calculateUsingThread(long n) {
+    private void calculateUsingThreads(long n) {
         long startTime = System.currentTimeMillis();
         new Thread(() -> {
-            BigInteger result = calculateSumOfSquares(n);
+            List<Range> ranges = RangeUtils.divideIntoRanges(n, numberOfTasks);
+            List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
+            List<Thread> threads = new ArrayList<>();
+            for (int i = 0; i < numberOfTasks; i++) {
+                Range range = ranges.get(i);
+                Thread thread = new Thread(() -> {
+                    BigInteger result = calculateSumOfSquares(range.getFrom(), range.getTo());
+                    sums.add(result);
+                    Log.d("calculateUsingThreads", "Thread " + Thread.currentThread().getId() + " finished");
+                });
+                threads.add(thread);
+                thread.start();
+            }
+            for (Thread thread : threads) {
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            BigInteger totalSum = BigInteger.ZERO;
+            for (BigInteger sum : sums) {
+                totalSum = totalSum.add(sum);
+            }
             long elapsedTime = getElapsedTime(startTime);
+            final BigInteger sum =  totalSum;
             runOnUiThread(() -> {
-                appendResult(R.string.result_using_thread, n, result, elapsedTime);
+                appendResult(R.string.result_using_thread, n, sum, elapsedTime);
                 updateLoadingState(false);
             });
         }).start();
     }
 
-    private BigInteger calculateSumOfSquares(long n) {
+
+    private BigInteger calculateSumOfSquares(long from, long to) {
         BigInteger sum = BigInteger.ZERO;
-        for (long i = 1; i <= n; i++) {
+        for (long i = from; i <= to; i++) {
             BigInteger number = BigInteger.valueOf(i);
             BigInteger square = number.multiply(number);
             sum = sum.add(square);
