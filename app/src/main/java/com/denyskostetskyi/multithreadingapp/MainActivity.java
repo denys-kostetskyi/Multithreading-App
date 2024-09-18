@@ -144,17 +144,19 @@ public class MainActivity extends AppCompatActivity {
 
     private void calculateUsingHandler(long n, List<Range> ranges) {
         long startTime = System.currentTimeMillis();
-        HandlerThread handlerThread = new HandlerThread("SumOfSquaresHandlerThread");
-        handlerThread.start();
-        Handler handler = new Handler(handlerThread.getLooper());
         List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch latch = new CountDownLatch(numberOfTasks);
         String logTag = "calculateUsingHandler";
         for (int i = 0; i < numberOfTasks; i++) {
             Range range = ranges.get(i);
-            handler.post(new SumOfSquaresRunnable(range, sums, latch, logTag));
+            HandlerThread taskThread = prepareHandlerThread("HandlerThread-" + i);
+            getHandler(taskThread).post(() -> {
+                new SumOfSquaresRunnable(range, sums, latch, logTag).run();
+                taskThread.quitSafely();
+            });
         }
-        handler.post(() -> {
+        HandlerThread handlerThread = prepareHandlerThread(logTag);
+        getHandler(handlerThread).post(() -> {
             try {
                 latch.await();
                 final BigInteger totalSum = getTotalSum(sums);
@@ -165,11 +167,22 @@ public class MainActivity extends AppCompatActivity {
                         totalSum,
                         elapsedTime
                 ));
-                handlerThread.quitSafely();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
+            } finally {
+                handlerThread.quitSafely();
             }
         });
+    }
+
+    private HandlerThread prepareHandlerThread(String name) {
+        HandlerThread handlerThread = new HandlerThread(name);
+        handlerThread.start();
+        return handlerThread;
+    }
+
+    private Handler getHandler(HandlerThread handlerThread) {
+        return new Handler(handlerThread.getLooper());
     }
 
     private void calculateUsingCompletableFuture(long n, List<Range> ranges) {
