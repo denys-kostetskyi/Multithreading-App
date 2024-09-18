@@ -1,6 +1,8 @@
 package com.denyskostetskyi.multithreadingapp;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.view.View;
 import android.widget.SeekBar;
 
@@ -20,10 +22,13 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends AppCompatActivity {
+    public static final int PARALLEL_METHODS_COUNT = 2; //Threads and Handler tasks
     private ActivityMainBinding binding;
     private int numberOfTasks = 1;
+    private AtomicInteger completedMethodsCounter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,13 +106,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void calculate(long input) {
-        calculateUsingThreads(input);
+        List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
+        completedMethodsCounter = new AtomicInteger();
+        calculateUsingThreads(input, ranges);
+        calculateUsingHandler(input, ranges);
     }
 
-    private void calculateUsingThreads(long n) {
+    private void calculateUsingThreads(long n, List<Range> ranges) {
         long startTime = System.currentTimeMillis();
         new Thread(() -> {
-            List<Range> ranges = RangeUtils.divideIntoRanges(n, numberOfTasks);
             List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
             List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < numberOfTasks; i++) {
@@ -128,16 +135,64 @@ public class MainActivity extends AppCompatActivity {
                 totalSum = totalSum.add(sum);
             }
             long elapsedTime = getElapsedTime(startTime);
-            final BigInteger sum =  totalSum;
-            runOnUiThread(() -> {
-                appendResult(R.string.result_using_thread, n, sum, elapsedTime);
-                updateLoadingState(false);
-            });
+            final BigInteger sum = totalSum;
+            runOnUiThread(() -> updateUi(
+                    R.string.result_using_threads,
+                    n,
+                    sum,
+                    elapsedTime
+            ));
         }).start();
     }
 
+    private void calculateUsingHandler(long n, List<Range> ranges) {
+        long startTime = System.currentTimeMillis();
+        HandlerThread handlerThread = new HandlerThread("SumOfSquaresHandlerThread");
+        handlerThread.start();
+        Handler handler = new Handler(handlerThread.getLooper());
+        List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger completedTaskCount = new AtomicInteger();
+        for (int i = 0; i < numberOfTasks; i++) {
+            Range range = ranges.get(i);
+            Runnable task = new SumOfSquaresRunnable(range, sums);
+            handler.post(() -> {
+                task.run();
+                int finished = completedTaskCount.incrementAndGet();
+                if (finished == numberOfTasks) {
+                    BigInteger totalSum = BigInteger.ZERO;
+                    for (BigInteger sum : sums) {
+                        totalSum = totalSum.add(sum);
+                    }
+                    long elapsedTime = getElapsedTime(startTime);
+
+                    final BigInteger sum = totalSum;
+                    runOnUiThread(() -> updateUi(
+                            R.string.result_using_handler,
+                            n,
+                            sum,
+                            elapsedTime
+                    ));
+                    handlerThread.quitSafely();
+                }
+            });
+        }
+    }
+
+
     private long getElapsedTime(long startTime) {
         return System.currentTimeMillis() - startTime;
+    }
+
+    private void updateUi(
+            @StringRes int methodStringId,
+            long n,
+            BigInteger sum,
+            long elapsedTime
+    ) {
+        appendResult(methodStringId, n, sum, elapsedTime);
+        if (completedMethodsCounter.incrementAndGet() == PARALLEL_METHODS_COUNT) {
+            updateLoadingState(false);
+        }
     }
 
     private void appendResult(
