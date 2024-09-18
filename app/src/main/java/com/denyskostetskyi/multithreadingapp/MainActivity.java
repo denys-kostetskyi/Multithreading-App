@@ -22,13 +22,15 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends AppCompatActivity {
-    public static final int PARALLEL_METHODS_COUNT = 2; //Threads and Handler tasks
-    private ActivityMainBinding binding;
-    private int numberOfTasks = 1;
+    public static final int PARALLEL_METHODS_COUNT = 3; //Threads, Handler and CompletableFuture methods
+
     private AtomicInteger completedMethodsCounter;
+    private int numberOfTasks = 1; // number of parallel tasks for each method
+    private ActivityMainBinding binding;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -106,10 +108,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void calculate(long input) {
-        List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
         completedMethodsCounter = new AtomicInteger();
+        List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
         calculateUsingThreads(input, ranges);
         calculateUsingHandler(input, ranges);
+        calculateUsingCompletableFuture(input, ranges);
     }
 
     private void calculateUsingThreads(long n, List<Range> ranges) {
@@ -178,6 +181,29 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void calculateUsingCompletableFuture(long n, List<Range> ranges) {
+        long startTime = System.currentTimeMillis();
+        List<CompletableFuture<BigInteger>> futures = new ArrayList<>();
+        for (int i = 0; i < numberOfTasks; i++) {
+            Range range = ranges.get(i);
+            CompletableFuture<BigInteger> future =
+                    CompletableFuture.supplyAsync(range::calculateSumOfSquares);
+            futures.add(future);
+        }
+        CompletableFuture<Void> allOfFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        allOfFutures.thenRun(() -> {
+            BigInteger totalSum = futures.stream()
+                    .map(CompletableFuture::join)
+                    .reduce(BigInteger.ZERO, BigInteger::add);
+            long elapsedTime = getElapsedTime(startTime);
+            runOnUiThread(() -> updateUi(
+                    R.string.result_using_completable_future,
+                    n,
+                    totalSum,
+                    elapsedTime
+            ));
+        });
+    }
 
     private long getElapsedTime(long startTime) {
         return System.currentTimeMillis() - startTime;
