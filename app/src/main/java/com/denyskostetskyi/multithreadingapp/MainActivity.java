@@ -28,7 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends AppCompatActivity {
-    public static final int PARALLEL_METHODS_COUNT = 3; //Threads, Handler and CompletableFuture methods
+    private static final int TOTAL_METHODS_COUNT = 3; //Threads, Handler and CompletableFuture methods
 
     private AtomicInteger completedMethodsCounter;
     private int parallelTasksCount = 1; // number of parallel tasks for each method
@@ -127,23 +127,10 @@ public class MainActivity extends AppCompatActivity {
             List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
             CountDownLatch latch = new CountDownLatch(parallelTasksCount);
             String logTag = "calculateUsingThreads";
-            for (int i = 0; i < parallelTasksCount; i++) {
-                Range range = ranges.get(i);
+            for (Range range : ranges) {
                 new Thread(new SumOfSquaresRunnable(range, sums, latch, logTag)).start();
             }
-            try {
-                latch.await();
-                final BigInteger totalSum = getTotalSum(sums);
-                long elapsedTime = stopwatch.getElapsedTime();
-                runOnUiThread(() -> updateUi(
-                        R.string.result_using_threads,
-                        n,
-                        totalSum,
-                        elapsedTime
-                ));
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            awaitResultAndUpdateUi(latch, R.string.result_using_threads, n, sums, stopwatch);
         }).start();
     }
 
@@ -152,45 +139,28 @@ public class MainActivity extends AppCompatActivity {
         List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
         CountDownLatch latch = new CountDownLatch(parallelTasksCount);
         String logTag = "calculateUsingHandler";
-        for (int i = 0; i < parallelTasksCount; i++) {
-            Range range = ranges.get(i);
-            HandlerThread taskThread = prepareHandlerThread("HandlerThread-" + i);
+        for (Range range : ranges) {
+            HandlerThread taskThread = startNewHandlerThread("TaskThread");
             getHandler(taskThread).post(() -> {
                 new SumOfSquaresRunnable(range, sums, latch, logTag).run();
                 taskThread.quitSafely();
             });
         }
-        HandlerThread handlerThread = prepareHandlerThread(logTag);
+        HandlerThread handlerThread = startNewHandlerThread(logTag);
         getHandler(handlerThread).post(() -> {
-            try {
-                latch.await();
-                final BigInteger totalSum = getTotalSum(sums);
-                long elapsedTime = stopwatch.getElapsedTime();
-                runOnUiThread(() -> updateUi(
-                        R.string.result_using_handler,
-                        n,
-                        totalSum,
-                        elapsedTime
-                ));
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } finally {
-                handlerThread.quitSafely();
-            }
+            awaitResultAndUpdateUi(latch, R.string.result_using_handler, n, sums, stopwatch);
+            handlerThread.quitSafely();
+
         });
     }
 
     private void calculateUsingCompletableFuture(long n, List<Range> ranges) {
         Stopwatch stopwatch = new Stopwatch();
         List<CompletableFuture<BigInteger>> futures = new ArrayList<>();
-        for (int i = 0; i < parallelTasksCount; i++) {
-            Range range = ranges.get(i);
-            CompletableFuture<BigInteger> future =
-                    CompletableFuture.supplyAsync(range::calculateSumOfSquares);
-            futures.add(future);
+        for (Range range : ranges) {
+            futures.add(CompletableFuture.supplyAsync(range::calculateSumOfSquares));
         }
-        CompletableFuture<Void> allOfFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-        allOfFutures.thenRun(() -> {
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenRun(() -> {
             BigInteger totalSum = futures.stream()
                     .map(CompletableFuture::join)
                     .reduce(BigInteger.ZERO, BigInteger::add);
@@ -204,7 +174,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private HandlerThread prepareHandlerThread(String name) {
+    private HandlerThread startNewHandlerThread(String name) {
         HandlerThread handlerThread = new HandlerThread(name);
         handlerThread.start();
         return handlerThread;
@@ -212,6 +182,28 @@ public class MainActivity extends AppCompatActivity {
 
     private Handler getHandler(HandlerThread handlerThread) {
         return new Handler(handlerThread.getLooper());
+    }
+
+    private void awaitResultAndUpdateUi(
+            CountDownLatch latch,
+            @StringRes int methodResId,
+            long n,
+            List<BigInteger> sums,
+            Stopwatch stopwatch
+    ) {
+        try {
+            latch.await();
+            final BigInteger totalSum = getTotalSum(sums);
+            long elapsedTime = stopwatch.getElapsedTime();
+            runOnUiThread(() -> updateUi(
+                    methodResId,
+                    n,
+                    totalSum,
+                    elapsedTime
+            ));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private BigInteger getTotalSum(List<BigInteger> sums) {
@@ -229,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
             long elapsedTime
     ) {
         appendResult(methodStringId, n, sum, elapsedTime);
-        if (completedMethodsCounter.incrementAndGet() == PARALLEL_METHODS_COUNT) {
+        if (completedMethodsCounter.incrementAndGet() == TOTAL_METHODS_COUNT) {
             updateLoadingState(false);
         }
     }
@@ -240,13 +232,12 @@ public class MainActivity extends AppCompatActivity {
             BigInteger sum,
             long elapsedTime
     ) {
-        String methodString = getString(methodStringId);
-        StringBuilder result = new StringBuilder(methodString);
-        result.append(getString(R.string.sum_of_squares_from_1_to_n, n));
-        result.append(sum.toString());
-        result.append("\n");
-        result.append(getString(R.string.elapsed_time, elapsedTime));
-        result.append("\n");
+        StringBuilder result = new StringBuilder(getString(methodStringId))
+                .append(getString(R.string.sum_of_squares_from_1_to_n, n))
+                .append(sum.toString())
+                .append("\n")
+                .append(getString(R.string.elapsed_time, elapsedTime))
+                .append("\n");
         binding.textViewResult.append(result);
     }
 }
