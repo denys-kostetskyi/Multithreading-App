@@ -2,6 +2,8 @@ package com.denyskostetskyi.multithreadingapp.model;
 
 import androidx.annotation.NonNull;
 
+import java.math.BigInteger;
+
 public class Range {
     private final long from;
     private final long to;
@@ -21,6 +23,16 @@ public class Range {
 
     public long getTo() {
         return to;
+    }
+
+    public BigInteger calculateSumOfSquares() {
+        BigInteger sum = BigInteger.ZERO;
+        for (long i = from; i <= to; i++) {
+            BigInteger number = BigInteger.valueOf(i);
+            BigInteger square = number.multiply(number);
+            sum = sum.add(square);
+        }
+        return sum;
     }
 
     @NonNull

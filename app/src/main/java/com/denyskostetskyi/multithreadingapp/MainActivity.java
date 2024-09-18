@@ -1,7 +1,6 @@
 package com.denyskostetskyi.multithreadingapp;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.SeekBar;
 
@@ -15,6 +14,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.denyskostetskyi.multithreadingapp.databinding.ActivityMainBinding;
 import com.denyskostetskyi.multithreadingapp.model.Range;
 import com.denyskostetskyi.multithreadingapp.util.RangeUtils;
+import com.denyskostetskyi.multithreadingapp.util.SumOfSquaresRunnable;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -112,11 +112,7 @@ public class MainActivity extends AppCompatActivity {
             List<Thread> threads = new ArrayList<>();
             for (int i = 0; i < numberOfTasks; i++) {
                 Range range = ranges.get(i);
-                Thread thread = new Thread(() -> {
-                    BigInteger result = calculateSumOfSquares(range.getFrom(), range.getTo());
-                    sums.add(result);
-                    Log.d("calculateUsingThreads", "Thread " + Thread.currentThread().getId() + " finished");
-                });
+                Thread thread = new Thread(new SumOfSquaresRunnable(range, sums));
                 threads.add(thread);
                 thread.start();
             }
@@ -138,17 +134,6 @@ public class MainActivity extends AppCompatActivity {
                 updateLoadingState(false);
             });
         }).start();
-    }
-
-
-    private BigInteger calculateSumOfSquares(long from, long to) {
-        BigInteger sum = BigInteger.ZERO;
-        for (long i = from; i <= to; i++) {
-            BigInteger number = BigInteger.valueOf(i);
-            BigInteger square = number.multiply(number);
-            sum = sum.add(square);
-        }
-        return sum;
     }
 
     private long getElapsedTime(long startTime) {
