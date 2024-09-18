@@ -2,6 +2,7 @@ package com.denyskostetskyi.multithreadingapp;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.SeekBar;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.StringRes;
@@ -11,11 +12,18 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.denyskostetskyi.multithreadingapp.databinding.ActivityMainBinding;
+import com.denyskostetskyi.multithreadingapp.model.Range;
+import com.denyskostetskyi.multithreadingapp.util.RangeUtils;
+import com.denyskostetskyi.multithreadingapp.util.SumOfSquaresRunnable;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
+    private int numberOfTasks = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,7 +36,36 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        initViews();
+    }
+
+    private void initViews() {
+        updateSeekBarLabel();
+        setSeekBarChangeListener();
         setButtonClickListener();
+    }
+
+    private void updateSeekBarLabel() {
+        String text = getString(R.string.number_of_parallel_tasks, numberOfTasks);
+        binding.textViewNumberOfTasks.setText(text);
+    }
+
+    private void setSeekBarChangeListener() {
+        binding.seekBarNumberOfTasks.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                numberOfTasks = progress + 1;
+                updateSeekBarLabel();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
     }
 
     private void setButtonClickListener() {
@@ -59,33 +96,44 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateLoadingState(boolean isLoading) {
         binding.progressBar.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        binding.seekBarNumberOfTasks.setEnabled(!isLoading);
         binding.buttonCalculate.setEnabled(!isLoading);
     }
 
     private void calculate(long input) {
-        calculateUsingThread(input);
+        calculateUsingThreads(input);
     }
 
-    private void calculateUsingThread(long n) {
+    private void calculateUsingThreads(long n) {
         long startTime = System.currentTimeMillis();
         new Thread(() -> {
-            BigInteger result = calculateSumOfSquares(n);
+            List<Range> ranges = RangeUtils.divideIntoRanges(n, numberOfTasks);
+            List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
+            List<Thread> threads = new ArrayList<>();
+            for (int i = 0; i < numberOfTasks; i++) {
+                Range range = ranges.get(i);
+                Thread thread = new Thread(new SumOfSquaresRunnable(range, sums));
+                threads.add(thread);
+                thread.start();
+            }
+            for (Thread thread : threads) {
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            BigInteger totalSum = BigInteger.ZERO;
+            for (BigInteger sum : sums) {
+                totalSum = totalSum.add(sum);
+            }
             long elapsedTime = getElapsedTime(startTime);
+            final BigInteger sum =  totalSum;
             runOnUiThread(() -> {
-                appendResult(R.string.result_using_thread, n, result, elapsedTime);
+                appendResult(R.string.result_using_thread, n, sum, elapsedTime);
                 updateLoadingState(false);
             });
         }).start();
-    }
-
-    private BigInteger calculateSumOfSquares(long n) {
-        BigInteger sum = BigInteger.ZERO;
-        for (long i = 1; i <= n; i++) {
-            BigInteger number = BigInteger.valueOf(i);
-            BigInteger square = number.multiply(number);
-            sum = sum.add(square);
-        }
-        return sum;
     }
 
     private long getElapsedTime(long startTime) {

@@ -7,4 +7,5 @@
     <string name="result_using_thread">Result using Thread:\n</string>
     <string name="sum_of_squares_from_1_to_n">The sum of squares of numbers from 1 to %1$d is:\n</string>
     <string name="elapsed_time">Elapsed time: %1$d ms.\n</string>
+    <string name="number_of_parallel_tasks">Number of parallel tasks: %1$d</string>
 </resources>
