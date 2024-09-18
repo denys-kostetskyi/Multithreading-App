@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MainActivity extends AppCompatActivity {
@@ -119,32 +120,25 @@ public class MainActivity extends AppCompatActivity {
         long startTime = System.currentTimeMillis();
         new Thread(() -> {
             List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
-            List<Thread> threads = new ArrayList<>();
+            CountDownLatch latch = new CountDownLatch(numberOfTasks);
+            String logTag = "calculateUsingThreads";
             for (int i = 0; i < numberOfTasks; i++) {
                 Range range = ranges.get(i);
-                Thread thread = new Thread(new SumOfSquaresRunnable(range, sums));
-                threads.add(thread);
-                thread.start();
+                new Thread(new SumOfSquaresRunnable(range, sums, latch, logTag)).start();
             }
-            for (Thread thread : threads) {
-                try {
-                    thread.join();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+            try {
+                latch.await();
+                final BigInteger totalSum = getTotalSum(sums);
+                long elapsedTime = getElapsedTime(startTime);
+                runOnUiThread(() -> updateUi(
+                        R.string.result_using_threads,
+                        n,
+                        totalSum,
+                        elapsedTime
+                ));
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
-            BigInteger totalSum = BigInteger.ZERO;
-            for (BigInteger sum : sums) {
-                totalSum = totalSum.add(sum);
-            }
-            long elapsedTime = getElapsedTime(startTime);
-            final BigInteger sum = totalSum;
-            runOnUiThread(() -> updateUi(
-                    R.string.result_using_threads,
-                    n,
-                    sum,
-                    elapsedTime
-            ));
         }).start();
     }
 
@@ -154,31 +148,28 @@ public class MainActivity extends AppCompatActivity {
         handlerThread.start();
         Handler handler = new Handler(handlerThread.getLooper());
         List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger completedTaskCount = new AtomicInteger();
+        CountDownLatch latch = new CountDownLatch(numberOfTasks);
+        String logTag = "calculateUsingHandler";
         for (int i = 0; i < numberOfTasks; i++) {
             Range range = ranges.get(i);
-            Runnable task = new SumOfSquaresRunnable(range, sums);
-            handler.post(() -> {
-                task.run();
-                int finished = completedTaskCount.incrementAndGet();
-                if (finished == numberOfTasks) {
-                    BigInteger totalSum = BigInteger.ZERO;
-                    for (BigInteger sum : sums) {
-                        totalSum = totalSum.add(sum);
-                    }
-                    long elapsedTime = getElapsedTime(startTime);
-
-                    final BigInteger sum = totalSum;
-                    runOnUiThread(() -> updateUi(
-                            R.string.result_using_handler,
-                            n,
-                            sum,
-                            elapsedTime
-                    ));
-                    handlerThread.quitSafely();
-                }
-            });
+            handler.post(new SumOfSquaresRunnable(range, sums, latch, logTag));
         }
+        handler.post(() -> {
+            try {
+                latch.await();
+                final BigInteger totalSum = getTotalSum(sums);
+                long elapsedTime = getElapsedTime(startTime);
+                runOnUiThread(() -> updateUi(
+                        R.string.result_using_handler,
+                        n,
+                        totalSum,
+                        elapsedTime
+                ));
+                handlerThread.quitSafely();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     private void calculateUsingCompletableFuture(long n, List<Range> ranges) {
@@ -203,6 +194,14 @@ public class MainActivity extends AppCompatActivity {
                     elapsedTime
             ));
         });
+    }
+
+    private BigInteger getTotalSum(List<BigInteger> sums) {
+        BigInteger totalSum = BigInteger.ZERO;
+        for (BigInteger sum : sums) {
+            totalSum = totalSum.add(sum);
+        }
+        return totalSum;
     }
 
     private long getElapsedTime(long startTime) {
