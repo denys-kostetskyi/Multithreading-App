@@ -16,6 +16,7 @@ import androidx.core.view.WindowInsetsCompat;
 import com.denyskostetskyi.multithreadingapp.databinding.ActivityMainBinding;
 import com.denyskostetskyi.multithreadingapp.model.Range;
 import com.denyskostetskyi.multithreadingapp.util.RangeUtils;
+import com.denyskostetskyi.multithreadingapp.util.Stopwatch;
 import com.denyskostetskyi.multithreadingapp.util.SumOfSquaresRunnable;
 
 import java.math.BigInteger;
@@ -30,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
     public static final int PARALLEL_METHODS_COUNT = 3; //Threads, Handler and CompletableFuture methods
 
     private AtomicInteger completedMethodsCounter;
-    private int numberOfTasks = 1; // number of parallel tasks for each method
+    private int parallelTasksCount = 1; // number of parallel tasks for each method
     private ActivityMainBinding binding;
 
     @Override
@@ -54,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateSeekBarLabel() {
-        String text = getString(R.string.number_of_parallel_tasks, numberOfTasks);
+        String text = getString(R.string.number_of_parallel_tasks, parallelTasksCount);
         binding.textViewNumberOfTasks.setText(text);
     }
 
@@ -62,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
         binding.seekBarNumberOfTasks.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                numberOfTasks = progress + 1;
+                parallelTasksCount = progress + 1;
                 updateSeekBarLabel();
             }
 
@@ -84,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             try {
-                List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
+                List<Range> ranges = RangeUtils.divideIntoRanges(input, parallelTasksCount);
                 binding.textViewResult.setText("");
                 updateLoadingState(true);
                 calculate(input, ranges);
@@ -121,19 +122,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void calculateUsingThreads(long n, List<Range> ranges) {
-        long startTime = System.currentTimeMillis();
+        Stopwatch stopwatch = new Stopwatch();
         new Thread(() -> {
             List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
-            CountDownLatch latch = new CountDownLatch(numberOfTasks);
+            CountDownLatch latch = new CountDownLatch(parallelTasksCount);
             String logTag = "calculateUsingThreads";
-            for (int i = 0; i < numberOfTasks; i++) {
+            for (int i = 0; i < parallelTasksCount; i++) {
                 Range range = ranges.get(i);
                 new Thread(new SumOfSquaresRunnable(range, sums, latch, logTag)).start();
             }
             try {
                 latch.await();
                 final BigInteger totalSum = getTotalSum(sums);
-                long elapsedTime = getElapsedTime(startTime);
+                long elapsedTime = stopwatch.getElapsedTime();
                 runOnUiThread(() -> updateUi(
                         R.string.result_using_threads,
                         n,
@@ -147,11 +148,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void calculateUsingHandler(long n, List<Range> ranges) {
-        long startTime = System.currentTimeMillis();
+        Stopwatch stopwatch = new Stopwatch();
         List<BigInteger> sums = Collections.synchronizedList(new ArrayList<>());
-        CountDownLatch latch = new CountDownLatch(numberOfTasks);
+        CountDownLatch latch = new CountDownLatch(parallelTasksCount);
         String logTag = "calculateUsingHandler";
-        for (int i = 0; i < numberOfTasks; i++) {
+        for (int i = 0; i < parallelTasksCount; i++) {
             Range range = ranges.get(i);
             HandlerThread taskThread = prepareHandlerThread("HandlerThread-" + i);
             getHandler(taskThread).post(() -> {
@@ -164,7 +165,7 @@ public class MainActivity extends AppCompatActivity {
             try {
                 latch.await();
                 final BigInteger totalSum = getTotalSum(sums);
-                long elapsedTime = getElapsedTime(startTime);
+                long elapsedTime = stopwatch.getElapsedTime();
                 runOnUiThread(() -> updateUi(
                         R.string.result_using_handler,
                         n,
@@ -179,20 +180,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private HandlerThread prepareHandlerThread(String name) {
-        HandlerThread handlerThread = new HandlerThread(name);
-        handlerThread.start();
-        return handlerThread;
-    }
-
-    private Handler getHandler(HandlerThread handlerThread) {
-        return new Handler(handlerThread.getLooper());
-    }
-
     private void calculateUsingCompletableFuture(long n, List<Range> ranges) {
-        long startTime = System.currentTimeMillis();
+        Stopwatch stopwatch = new Stopwatch();
         List<CompletableFuture<BigInteger>> futures = new ArrayList<>();
-        for (int i = 0; i < numberOfTasks; i++) {
+        for (int i = 0; i < parallelTasksCount; i++) {
             Range range = ranges.get(i);
             CompletableFuture<BigInteger> future =
                     CompletableFuture.supplyAsync(range::calculateSumOfSquares);
@@ -203,7 +194,7 @@ public class MainActivity extends AppCompatActivity {
             BigInteger totalSum = futures.stream()
                     .map(CompletableFuture::join)
                     .reduce(BigInteger.ZERO, BigInteger::add);
-            long elapsedTime = getElapsedTime(startTime);
+            long elapsedTime = stopwatch.getElapsedTime();
             runOnUiThread(() -> updateUi(
                     R.string.result_using_completable_future,
                     n,
@@ -213,16 +204,22 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private HandlerThread prepareHandlerThread(String name) {
+        HandlerThread handlerThread = new HandlerThread(name);
+        handlerThread.start();
+        return handlerThread;
+    }
+
+    private Handler getHandler(HandlerThread handlerThread) {
+        return new Handler(handlerThread.getLooper());
+    }
+
     private BigInteger getTotalSum(List<BigInteger> sums) {
         BigInteger totalSum = BigInteger.ZERO;
         for (BigInteger sum : sums) {
             totalSum = totalSum.add(sum);
         }
         return totalSum;
-    }
-
-    private long getElapsedTime(long startTime) {
-        return System.currentTimeMillis() - startTime;
     }
 
     private void updateUi(
