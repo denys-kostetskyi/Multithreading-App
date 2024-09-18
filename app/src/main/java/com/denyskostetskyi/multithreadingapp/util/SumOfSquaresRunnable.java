@@ -6,15 +6,24 @@ import com.denyskostetskyi.multithreadingapp.model.Range;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 public class SumOfSquaresRunnable implements Runnable {
-    public static final String TAG = "SumOfSquaresRunnable";
     private final Range range;
     private final List<BigInteger> sums;
+    private final CountDownLatch latch;
+    private final String logTag;
 
-    public SumOfSquaresRunnable(Range range, List<BigInteger> sums) {
+    public SumOfSquaresRunnable(
+            Range range,
+            List<BigInteger> sums,
+            CountDownLatch latch,
+            String logTag
+    ) {
         this.range = range;
         this.sums = sums;
+        this.latch = latch;
+        this.logTag = logTag;
     }
 
     @Override
@@ -23,6 +32,7 @@ public class SumOfSquaresRunnable implements Runnable {
         synchronized (sums) {
             sums.add(result);
         }
-        Log.d(TAG, "Thread " + Thread.currentThread().getId() + " finished for " + range);
+        latch.countDown();
+        Log.d(logTag, "Thread " + Thread.currentThread().getId() + " finished for " + range);
     }
 }

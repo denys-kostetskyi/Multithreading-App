@@ -7,10 +7,13 @@ import java.util.List;
 
 public class RangeUtils {
 
-    public static List<Range> divideIntoRanges(long lastNumber, int numberOfRanges) {
+    public static List<Range> divideIntoRanges(
+            long lastNumber,
+            int numberOfRanges
+    ) throws IllegalArgumentException {
         List<Range> ranges = new ArrayList<>();
-        if (lastNumber <= 0 || numberOfRanges <= 0) {
-            return ranges;
+        if (lastNumber <= 0 || numberOfRanges <= 0 || lastNumber < numberOfRanges) {
+            throw new IllegalArgumentException("lastNumber must be >= numberOfRanges and both values must be positive");
         }
         long rangeSize = lastNumber / numberOfRanges;
         long remainder = lastNumber % numberOfRanges;
