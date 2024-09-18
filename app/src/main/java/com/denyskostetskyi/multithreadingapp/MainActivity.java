@@ -81,10 +81,15 @@ public class MainActivity extends AppCompatActivity {
             long input = parseInputNumber();
             if (input == 0) {
                 showWarning();
-            } else {
+                return;
+            }
+            try {
+                List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
                 binding.textViewResult.setText("");
                 updateLoadingState(true);
-                calculate(input);
+                calculate(input, ranges);
+            } catch (IllegalArgumentException e) {
+                showWarning();
             }
         });
     }
@@ -108,9 +113,8 @@ public class MainActivity extends AppCompatActivity {
         binding.buttonCalculate.setEnabled(!isLoading);
     }
 
-    private void calculate(long input) {
+    private void calculate(long input, List<Range> ranges) {
         completedMethodsCounter = new AtomicInteger();
-        List<Range> ranges = RangeUtils.divideIntoRanges(input, numberOfTasks);
         calculateUsingThreads(input, ranges);
         calculateUsingHandler(input, ranges);
         calculateUsingCompletableFuture(input, ranges);
